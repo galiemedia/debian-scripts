@@ -64,7 +64,7 @@ sudo_check() {
 
 deps_check() {
     local missing_deps=()
-    for dep in curl wget gpg; do
+    for dep in curl wget gpg jq; do
         if ! command -v "$dep" &> /dev/null; then
             missing_deps+=("$dep")
         fi
@@ -95,13 +95,15 @@ gum_check() {
 }
 
 localetime_setup() {
-    gum style --foreground 57 --padding "1 1" "Running Configuration Utility to set Environment Locale..."
-    sleep 1
-    $USE_SUDO dpkg-reconfigure locales
-    gum style --foreground 57 --padding "1 1" "Running Configuration Utility to set Environment Timezone..."
-    sleep 1
-    $USE_SUDO dpkg-reconfigure tzdata
-    gum style --foreground 212 --padding "1 1" "Environment Locale and Timezone have been set and updated."
+    if gum confirm "Do you want to set the locale and timezone for this environment?"; then
+        gum style --foreground 57 --padding "1 1" "Running Configuration Utility to set Environment Locale..."
+        sleep 1
+        $USE_SUDO dpkg-reconfigure locales
+        gum style --foreground 57 --padding "1 1" "Running Configuration Utility to set Environment Timezone..."
+        sleep 1
+        $USE_SUDO dpkg-reconfigure tzdata
+        gum style --foreground 212 --padding "1 1" "Environment Locale and Timezone have been set and updated."
+    fi
 }
 
 apt_update() {
@@ -117,7 +119,7 @@ apt_update() {
 
 fastfetch_setup() {
     if command -v neofetch >&2; then
-        gum style --foreground 57 --padding "1 1" "Removing depreciated neofetch..."
+        gum style --foreground 57 --padding "1 1" "Removing deprecated neofetch..."
         sleep 1
         $USE_SUDO apt purge -y neofetch
         gum style --foreground 212 --padding "1 1" "The neofetch package has been removed."
@@ -247,7 +249,7 @@ pkgoptions_setup() {
                 gum style --foreground 212 --padding "1 1" "Node.js support and npm have been installed."
                 ;;
             "Starship Prompt Enhancements")
-                gum style --foreground 57 --padding "1 1" "Installing starship prompt enchancements..."
+                gum style --foreground 57 --padding "1 1" "Installing starship prompt enhancements..."
                 sleep 1
                 if ! command -v starship &> /dev/null; then
                     curl -sS https://starship.rs/install.sh | sh
@@ -259,7 +261,7 @@ pkgoptions_setup() {
                 touch $HOME/.config/starship.toml
                 starship preset plain-text-symbols -o $HOME/.config/starship.toml
                 echo "if [ -f /usr/bin/fastfetch ]; then fastfetch; fi" >> $HOME/.bashrc
-                gum style --foreground 212 --padding "1 1" "Starship prompt enchancements have been installed."
+                gum style --foreground 212 --padding "1 1" "Starship prompt enhancements have been installed."
                 ;;
             "System Information Utilities")
                 gum style --foreground 57 --padding "1 1" "Installing system information utilities..."
@@ -272,7 +274,7 @@ pkgoptions_setup() {
                 sleep 1
                 $USE_SUDO curl -fsSL https://tailscale.com/install.sh | sh
                 gum style --foreground 57 --padding "1 1" "Prompting for Tailscale activation..."
-                $USE_SUDO tailscale up
+                $USE_SUDO tailscale up --qr
                 if gum confirm "Do you want this environment to be an exit node?"; then
                     $USE_SUDO tailscale set --advertise-exit-node=true
                     echo 'net.ipv4.ip_forward = 1' | $USE_SUDO tee -a /etc/sysctl.d/99-tailscale.conf
@@ -366,70 +368,113 @@ firewall_setup() {
             SSH_PORT=22
         fi
         if [[ "$SSH_PORT" =~ ^[0-9]+$ ]] && [ "$SSH_PORT" -ge 1 ] && [ "$SSH_PORT" -le 65535 ]; then
-            $USE_SUDO ufw allow $SSH_PORT/tcp
+            if ! $USE_SUDO ufw status | grep -q "$SSH_PORT/tcp"; then
+                $USE_SUDO ufw allow $SSH_PORT/tcp
+            fi
         else
             gum style --foreground 196 --padding "1 1" "Invalid port number. Skipping SSH port rule."
         fi
     fi
     if gum confirm "Do you want to allow web site traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 80 HTTP traffic..."
-        $USE_SUDO ufw allow 80/tcp comment 'HTTP'
+        if ! $USE_SUDO ufw status | grep -q "80/tcp"; then
+            $USE_SUDO ufw allow 80/tcp comment 'HTTP'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 443 HTTPS traffic..."
-        $USE_SUDO ufw allow 443/tcp comment 'HTTPS'
+        if ! $USE_SUDO ufw status | grep -q "443/tcp"; then
+            $USE_SUDO ufw allow 443/tcp comment 'HTTPS'
+        fi
     fi
     if gum confirm "Do you want to allow FTP traffic through the firewall?"; then
-        gum style --foreground 57 --padding "1 1" "Adding rule for Port 20 FTP transfer traffic..."
-        $USE_SUDO ufw allow 20/tcp comment 'FTP Transfer'
-        gum style --foreground 57 --padding "1 1" "Adding rule for Port 21 FTP control traffic..."
-        $USE_SUDO ufw allow 21/tcp comment 'FTP Control'
+        gum style --foreground 57 --padding "1 1" "Adding rule for Port 21 FTP traffic..."
+        if ! $USE_SUDO ufw status | grep -q "21/tcp"; then
+            $USE_SUDO ufw allow 21/tcp comment 'FTP'
+        fi
+        gum style --foreground 57 --padding "1 1" "Adding rule for FTP transfers (Ports 12000-12100)..."
+        if ! $USE_SUDO ufw status | grep -q "12000:12100/tcp"; then
+            $USE_SUDO ufw allow 12000:12100/tcp comment 'FTP Transfers'
+        fi
     fi
     if gum confirm "Do you want to allow DNS traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 53 DNS TCP traffic..."
-        $USE_SUDO ufw allow 53/tcp comment 'DNS TCP'
+        if ! $USE_SUDO ufw status | grep -q "53/tcp"; then
+            $USE_SUDO ufw allow 53/tcp comment 'DNS TCP'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 53 DNS UDP traffic..."
-        $USE_SUDO ufw allow 53/udp comment 'DNS UDP'
+        if ! $USE_SUDO ufw status | grep -q "53/udp"; then
+            $USE_SUDO ufw allow 53/udp comment 'DNS UDP'
+        fi
     fi
     if gum confirm "Do you want to allow mail traffic (POP3, IMAP, and SMTP) through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 110 POP3 traffic..."
-        $USE_SUDO ufw allow 110/tcp comment 'POP3'
+        if ! $USE_SUDO ufw status | grep -q "110/tcp"; then
+            $USE_SUDO ufw allow 110/tcp comment 'POP3'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 143 IMAP traffic..."
-        $USE_SUDO ufw allow 143/tcp comment 'IMAP'
+        if ! $USE_SUDO ufw status | grep -q "143/tcp"; then
+            $USE_SUDO ufw allow 143/tcp comment 'IMAP'
+        fi
+        
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 465 SMTP TLS traffic..."
-        $USE_SUDO ufw allow 465/tcp comment 'SMTP TLS'
+        if ! $USE_SUDO ufw status | grep -q "465/tcp"; then
+            $USE_SUDO ufw allow 465/tcp comment 'SMTP TLS'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 587 SMTP SSL traffic..."
-        $USE_SUDO ufw allow 587/tcp comment 'SMTP SSL'
+        if ! $USE_SUDO ufw status | grep -q "587/tcp"; then
+            $USE_SUDO ufw allow 587/tcp comment 'SMTP SSL'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 993 POP3S traffic..."
-        $USE_SUDO ufw allow 993/tcp comment 'POP3S'
+        if ! $USE_SUDO ufw status | grep -q "993/tcp"; then
+            $USE_SUDO ufw allow 993/tcp comment 'POP3S'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 995 IMAPS traffic..."
-        $USE_SUDO ufw allow 995/tcp comment 'IMAPS'
+        if ! $USE_SUDO ufw status | grep -q "995/tcp"; then
+            $USE_SUDO ufw allow 995/tcp comment 'IMAPS'
+        fi        
     fi
     if gum confirm "Do you want to allow remote MySQL traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 3306 MySQL traffic..."
-        $USE_SUDO ufw allow 3306/tcp comment 'MySQL'
+        if ! $USE_SUDO ufw status | grep -q "3306/tcp"; then
+            $USE_SUDO ufw allow 3306/tcp comment 'MySQL'
+        fi
     fi
     if gum confirm "Do you want to allow remote PostgreSQL traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 5432 PostgreSQL traffic..."
-        $USE_SUDO ufw allow 5432/tcp comment 'PgSQL'
+        if ! $USE_SUDO ufw status | grep -q "5432/tcp"; then
+            $USE_SUDO ufw allow 5432/tcp comment 'PgSQL'
+        fi
     fi
     if gum confirm "Do you want to allow Docker (Port 3000) traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 3000 Docker traffic..."
-        $USE_SUDO ufw allow 3000/tcp comment 'Docker'
+        if ! $USE_SUDO ufw status | grep -q "3000/tcp"; then
+            $USE_SUDO ufw allow 3000/tcp comment 'Docker'
+        fi
     fi
     if gum confirm "Do you want to allow Container Application (Ports 6001, 6002, and 8000) traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 6001 Container RTC traffic..."
-        $USE_SUDO ufw allow 6001/tcp comment 'Container RTC'
+        if ! $USE_SUDO ufw status | grep -q "6001/tcp"; then
+            $USE_SUDO ufw allow 6001/tcp comment 'Container RTC'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 6002 Container SSH traffic..."
-        $USE_SUDO ufw allow 6002/tcp comment 'Container SSH'
+        if ! $USE_SUDO ufw status | grep -q "6002/tcp"; then
+            $USE_SUDO ufw allow 6002/tcp comment 'Container SSH'
+        fi
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 8000 Container traffic..."
-        $USE_SUDO ufw allow 8000/tcp comment 'Container Controls'
+        if ! $USE_SUDO ufw status | grep -q "8000/tcp"; then
+            $USE_SUDO ufw allow 8000/tcp comment 'Container Controls'
+        fi
     fi
     if gum confirm "Do you want to allow Control Panel (Port 8083) traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 8083 Control Panel traffic..."
-        $USE_SUDO ufw allow 8083/tcp comment 'Control Panel'
+        if ! $USE_SUDO ufw status | grep -q "8083/tcp"; then
+            $USE_SUDO ufw allow 8083/tcp comment 'Control Panel'
+        fi
     fi
     if gum confirm "Do you want to allow Application Control (Port 8443) traffic through the firewall?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for Port 8443 Application Controls traffic..."
-        $USE_SUDO ufw allow 8443/tcp comment 'Application Controls'
+        if ! $USE_SUDO ufw status | grep -q "8443/tcp"; then
+            $USE_SUDO ufw allow 8443/tcp comment 'Application Controls'
+        fi
     fi
     if gum confirm "Do you want to deny all incoming traffic by default other than the allowed rules?"; then
         gum style --foreground 57 --padding "1 1" "Adding rule for denying incoming traffic..."

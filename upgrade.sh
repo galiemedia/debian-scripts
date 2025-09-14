@@ -2,7 +2,7 @@
 # +----------------------------------------------------------------------------+
 # |     upgrade.sh - A script to help upgrade from Debian 12 to Debian 13.     |
 # +----------------------------------------------------------------------------+
-set -e
+set -euo pipefail
 
 connection_check() {
     ping -c 1 8.8.8.8 &> /dev/null || { echo " Error: No internet connection."; exit 1; }
@@ -49,7 +49,7 @@ sudo_check() {
 
 deps_check() {
     local missing_deps=()
-    for dep in curl wget gpg; do
+    for dep in curl wget gpg jq; do
         if ! command -v "$dep" &> /dev/null; then
             missing_deps+=("$dep")
         fi
@@ -107,7 +107,7 @@ apt_fullupdate() {
 
 fastfetch_setup() {
     if command -v neofetch >&2; then
-        gum style --foreground 57 --padding "1 1" "Removing depreciated neofetch..."
+        gum style --foreground 57 --padding "1 1" "Removing deprecated neofetch..."
         sleep 1
         $USE_SUDO apt purge -y neofetch
         gum style --foreground 212 --padding "1 1" "The neofetch package has been removed."
