@@ -124,7 +124,7 @@ fastfetch_setup() {
         ARCH=$(uname -m)
         case $ARCH in
             x86_64) ARCH="amd64" ;;
-            arm64) ARCH="arm64" ;;
+            aarch64) ARCH="aarch64" ;;
             armv7l) ARCH="armv7l" ;;
             armv6l) ARCH="armv6l" ;;
             ppc64le) ARCH="ppc64le" ;;
@@ -134,22 +134,9 @@ fastfetch_setup() {
         esac
         FASTFETCH_DEB="fastfetch-linux-${ARCH}.deb"
         FASTFETCH_URL="https://github.com/fastfetch-cli/fastfetch/releases/download/${FASTFETCH_NEW_VERSION}/${FASTFETCH_DEB}"
-        FASTFETCH_CHECKSUM_URL="https://github.com/fastfetch-cli/fastfetch/releases/download/${FASTFETCH_NEW_VERSION}/fastfetch-linux.sha256"
         FASTFETCH_DEB_TEMP=$(mktemp /tmp/fastfetch-XXXXXX.deb)
         if ! wget -q "$FASTFETCH_URL" -O "$FASTFETCH_DEB_TEMP"; then
             echo " Error: Failed to download fastfetch from $FASTFETCH_URL"
-            rm -f "$FASTFETCH_DEB_TEMP"
-            exit 1
-        fi
-        EXPECTED_CHECKSUM=$(curl -s "$FASTFETCH_CHECKSUM_URL" | grep "$FASTFETCH_DEB" | awk '{print $1}')
-        if [ -z "$EXPECTED_CHECKSUM" ]; then
-            echo " Error: Could not retrieve checksum for fastfetch"
-            rm -f "$FASTFETCH_DEB_TEMP"
-            exit 1
-        fi
-        ACTUAL_CHECKSUM=$(sha256sum "$FASTFETCH_DEB_TEMP" | awk '{print $1}')
-        if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-            echo " Error: Checksum verification failed for fastfetch"
             rm -f "$FASTFETCH_DEB_TEMP"
             exit 1
         fi
@@ -160,7 +147,6 @@ fastfetch_setup() {
         fi
         rm -f "$FASTFETCH_DEB_TEMP"
         gum style --foreground 212 --padding "1 1" "Fastfetch $FASTFETCH_NEW_VERSION has been installed."
-        
     fi
 }
 

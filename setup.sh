@@ -88,7 +88,12 @@ pkgoptions_setup() {
                 fi
                 touch $HOME/.config/starship.toml
                 starship preset plain-text-symbols -o $HOME/.config/starship.toml
-                echo "if [ -f /usr/bin/fastfetch ]; then fastfetch; fi" >> $HOME/.bashrc
+                if command -v fastfetch &> /dev/null; then
+                    FASTFETCH_BLOCK='uptime; echo ""; if command -v fastfetch &> /dev/null; then fastfetch; fi; echo ""; df -h'
+                    if ! grep -Fxq "$FASTFETCH_BLOCK" "$HOME/.bashrc"; then
+                        echo "$FASTFETCH_BLOCK" >> "$HOME/.bashrc"
+                    fi
+                fi
                 gum style --foreground 212 --padding "1 1" "Starship prompt enhancements have been installed."
                 ;;
             "System Information Utilities")
