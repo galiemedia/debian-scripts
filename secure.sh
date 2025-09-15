@@ -4,7 +4,21 @@
 # +----------------------------------------------------------------------------+
 set -euo pipefail
 
-source ./common.sh
+COMMON_SH_PATH=""
+if [ -f "./common.sh" ]; then
+    COMMON_SH_PATH="./common.sh"
+elif [ -f "$HOME/debian-scripts/common.sh" ]; then
+    COMMON_SH_PATH="$HOME/debian-scripts/common.sh"
+elif [ -f "$HOME/scripts/common.sh" ]; then
+    COMMON_SH_PATH="$HOME/scripts/common.sh"
+elif [ -f "$HOME/Scripts/common.sh" ]; then
+    COMMON_SH_PATH="$HOME/scripts/common.sh"
+else
+    echo " Error: common.sh not found in ./, ~/debian-scripts/, ~/scripts/, or ~/Scripts/."
+    exit 1
+fi
+
+source "$COMMON_SH_PATH"
 connection_check
 version_check
 sudo_check
